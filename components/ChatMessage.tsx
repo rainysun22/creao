@@ -6,6 +6,7 @@ export interface UIMessage {
   content: string;
   timestamp: string;
   muted?: boolean;
+  typing?: boolean;
 }
 
 interface Props {
@@ -38,6 +39,7 @@ export default function ChatMessage({ message }: Props) {
           style={{ color: message.muted ? "#bbbbbb" : "#333333" }}
         >
           {message.content}
+          {message.typing && <span className="typing-caret">▍</span>}
         </div>
       )}
     </div>

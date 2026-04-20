@@ -51,10 +51,64 @@ input::placeholder {
   color: var(--ink-faint);
 }
 
-/* Thin scrollbar */
+/* Thin scrollbar, pinned to the far right of the viewport */
+.scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: #d0d0d0 transparent;
+}
+
+/* Fade + blur overlay for content scrolling above the visible area.
+   Two stacked absolute layers at the top of the scroll viewport:
+   1) .fade-blur  — transparent bg + backdrop-filter: blur(...) masked so
+      the blur is strongest at the top edge and fades out downward.
+   2) .fade-wash  — white gradient on top of the blur, solid white at the
+      very top fading to transparent below, so content dissolves into the
+      page background as it scrolls up.
+   Together they create a "dissolving into mist" effect. */
+.fade-blur,
+.fade-wash {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 110px;
+  pointer-events: none;
+}
+
+.fade-blur {
+  z-index: 4;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    rgba(0, 0, 0, 0.7) 45%,
+    rgba(0, 0, 0, 0.25) 75%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    rgba(0, 0, 0, 0.7) 45%,
+    rgba(0, 0, 0, 0.25) 75%,
+    transparent 100%
+  );
+}
+
+.fade-wash {
+  z-index: 5;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(255, 255, 255, 0.85) 35%,
+    rgba(255, 255, 255, 0.45) 65%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
 .scroll-area::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
 }
 
 .scroll-area::-webkit-scrollbar-track {
@@ -62,12 +116,12 @@ input::placeholder {
 }
 
 .scroll-area::-webkit-scrollbar-thumb {
-  background: #e0e0e0;
-  border-radius: 2px;
+  background: #d0d0d0;
+  border-radius: 3px;
 }
 
 .scroll-area::-webkit-scrollbar-thumb:hover {
-  background: #cccccc;
+  background: #a8a8a8;
 }
 
 /* ASCII avatar random flicker (applied via class toggling on characters) */
@@ -78,6 +132,20 @@ input::placeholder {
 @keyframes flicker {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
+}
+
+/* Typing caret for streaming messages */
+.typing-caret {
+  display: inline-block;
+  margin-left: 2px;
+  color: #999;
+  animation: caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes caret-blink {
+  to {
+    visibility: hidden;
+  }
 }
 
 /* subtle shiver on the whole avatar */
