@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #ffffff;
+  --ink: #333333;
+  --ink-muted: #999999;
+  --ink-faint: #bbbbbb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: "JetBrains Mono", Menlo, Consolas, "Courier New", monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "tnum" 1;
+}
+
+body {
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+}
+
+input {
+  font-family: inherit;
+  background: none;
+  border: none;
+  outline: none;
+  color: inherit;
+}
+
+input::placeholder {
+  color: var(--ink-faint);
+}
+
+/* Thin scrollbar */
+.scroll-area::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-area::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 2px;
+}
+
+.scroll-area::-webkit-scrollbar-thumb:hover {
+  background: #cccccc;
+}
+
+/* ASCII avatar random flicker (applied via class toggling on characters) */
+.ascii-flicker {
+  animation: flicker 1.4s infinite;
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* subtle shiver on the whole avatar */
+.ascii-shiver {
+  animation: shiver 0.18s infinite;
+  display: inline-block;
+  will-change: transform;
+}
+
+@keyframes shiver {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(0.5px, -0.3px); }
+  50% { transform: translate(-0.3px, 0.4px); }
+  75% { transform: translate(0.4px, 0.3px); }
+}
