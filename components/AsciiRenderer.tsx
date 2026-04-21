@@ -32,20 +32,20 @@ const CHARSET =
 //                      or when the output looks "reversed" (white hair,
 //                      black face, etc.).
 const PARAMS = {
-  cellSize: 2.0,
+  cellSize: 1.6,
   charAspect: 1.18,
-  glyphScaleX: 0.65,
-  glyphScaleY: 0.74,
-  inkStrength: 1.8,
-  glyphGamma: 0.9,
-  featureBoost: 0.08,
+  glyphScaleX: 0.7,
+  glyphScaleY: 0.8,
+  inkStrength: 2.0,
+  glyphGamma: 1.0,
+  featureBoost: 0.04,
   // Widened thresholds so ordinary photos (not just pure white backgrounds)
   // render without crushing either extreme.
-  blackThreshold: 0.02,
-  blackSoftness: 0.25,
-  whiteThreshold: 0.95,
+  blackThreshold: 0.1,
+  blackSoftness: 0.2,
+  whiteThreshold: 0.75,
   whiteSoftness: 0.15,
-  contrast: 2.4,
+  contrast: 3.2,
   alpha: 1.0,
   invert: false,
 };
