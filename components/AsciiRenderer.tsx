@@ -23,6 +23,14 @@ const CHARSET =
   " .'`,:;Il!i~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 
 // Visual tuning; values chosen to read well on a white page.
+//
+// `invert` flips the brightness→glyph-density mapping:
+//   - false (default): dark pixels → dense glyphs (@, #).
+//                      Use for photos with LIGHT backgrounds + DARK subject.
+//   - true:            bright pixels → dense glyphs.
+//                      Use for photos with DARK backgrounds + LIGHT subject,
+//                      or when the output looks "reversed" (white hair,
+//                      black face, etc.).
 const PARAMS = {
   cellSize: 2.0,
   charAspect: 1.18,
@@ -31,12 +39,15 @@ const PARAMS = {
   inkStrength: 1.8,
   glyphGamma: 0.9,
   featureBoost: 0.08,
-  blackThreshold: 0.05,
-  blackSoftness: 0.1,
-  whiteThreshold: 0.85,
-  whiteSoftness: 0.1,
-  contrast: 4.2,
+  // Widened thresholds so ordinary photos (not just pure white backgrounds)
+  // render without crushing either extreme.
+  blackThreshold: 0.02,
+  blackSoftness: 0.25,
+  whiteThreshold: 0.95,
+  whiteSoftness: 0.15,
+  contrast: 2.4,
   alpha: 1.0,
+  invert: false,
 };
 
 /** Render the glyph atlas: one tall strip of bold monochrome characters. */
@@ -147,7 +158,7 @@ function buildPlaceholderTexture(): THREE.CanvasTexture {
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.needsUpdate = true;
-  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.colorSpace = THREE.NoColorSpace;
   tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
   return tex;
@@ -180,6 +191,7 @@ const FRAGMENT_SHADER = `
   uniform float uWhiteSoftness;
   uniform float uContrast;
   uniform float uAlpha;
+  uniform float uInvert;
   uniform vec3 uBackgroundColor;
   uniform vec3 uForegroundColor;
 
@@ -224,13 +236,10 @@ const FRAGMENT_SHADER = `
     vec3 color = tex.rgb;
 
     float darkScore = max(max(color.r, color.g), color.b);
-    float darkMask = smoothstep(
-      uBlackThreshold,
-      uBlackThreshold + uBlackSoftness,
-      darkScore
-    );
-
     float whiteScore = min(min(color.r, color.g), color.b);
+
+    // Mask of "this pixel is not paper-white background" — used to fade
+    // the edges of the subject so background doesn't render as ink.
     float lightMask = 1.0 - smoothstep(
       uWhiteThreshold,
       uWhiteThreshold + uWhiteSoftness,
@@ -241,8 +250,15 @@ const FRAGMENT_SHADER = `
       uBlackThreshold + uBlackSoftness,
       darkScore
     );
-
-    float fgMask = lightMask * shadowCutMask;
+    // Foreground presence mask. In normal mode subject is darker than paper.
+    // In invert mode subject is brighter than the (dark) background, so we
+    // use the inverse cut: region is foreground when the pixel is bright
+    // relative to the black threshold of the background.
+    float fgMask = mix(
+      lightMask * shadowCutMask,
+      shadowCutMask,
+      uInvert
+    );
 
     color = (color - 0.5) * uContrast + 0.5;
     color = clamp(color, 0.0, 1.0);
@@ -270,34 +286,88 @@ const FRAGMENT_SHADER = `
     );
 
     brightness = clamp(brightness - featureMask * 0.45, 0.0, 1.0);
-    float idx = floor((1.0 - brightness) * (uGlyphCount - 1.0) + 0.5);
+    // Density lookup. Normal mode: dark pixel → dense glyph (@, #).
+    // Invert mode: bright pixel → dense glyph.
+    float density = mix(1.0 - brightness, brightness, uInvert);
+    float idx = floor(density * (uGlyphCount - 1.0) + 0.5);
     float glyph = sampleGlyph(glyphUv, idx);
     float inkMask = min(1.0, glyph * (fgMask + featureMask * 0.3));
     float glyphAlpha = pow(inkMask, 0.82);
     float inkTone = smoothstep(0.06, 0.72, inkMask);
     inkTone = min(1.0, pow(inkTone, 0.68) * 1.08);
-    float finalAlpha = max(glyphAlpha, shadowCutMask) * uAlpha;
+    // In invert mode the "surface" is the bright subject, so use fgMask
+    // rather than shadowCutMask to drive the surface alpha.
+    float surfaceAlpha = mix(shadowCutMask, fgMask, uInvert);
+    float finalAlpha = max(glyphAlpha, surfaceAlpha) * uAlpha;
     vec3 finalColor = mix(uBackgroundColor, uForegroundColor, inkTone);
     gl_FragColor = vec4(finalColor, finalAlpha);
   }
 `;
 
-/** Try loading an asset; resolves to null if it 404s or fails to decode. */
-async function probeAsset(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, { method: "HEAD" });
-    return res.ok;
-  } catch {
-    return false;
-  }
+/** Image source candidates checked in order. First one that successfully
+ *  decodes as an <img> wins. Drop any of these into `public/` to use. */
+const IMAGE_CANDIDATES = [
+  "/avatar.jpg",
+  "/avatar.jpeg",
+  "/avatar.png",
+  "/avatar.webp",
+];
+
+/** Video source candidates checked in order. */
+const VIDEO_CANDIDATES = ["/avatar.mp4", "/avatar.webm"];
+
+/** Try decoding an image URL. Resolves with the decoded HTMLImageElement
+ *  on success, or null on 404 / decode error. Uses an actual <img> so it
+ *  works even on static hosts that don't support HEAD. */
+function probeImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+/** Probe a video source by attempting to load metadata. */
+function probeVideo(
+  videoEl: HTMLVideoElement,
+  url: string,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const onLoaded = () => {
+      videoEl.removeEventListener("loadeddata", onLoaded);
+      videoEl.removeEventListener("error", onError);
+      resolve(true);
+    };
+    const onError = () => {
+      videoEl.removeEventListener("loadeddata", onLoaded);
+      videoEl.removeEventListener("error", onError);
+      resolve(false);
+    };
+    videoEl.addEventListener("loadeddata", onLoaded, { once: true });
+    videoEl.addEventListener("error", onError, { once: true });
+    videoEl.src = url;
+    videoEl.load();
+  });
 }
 
 interface Props {
   /** height of the renderer as a fraction of viewport height (default 0.38) */
   heightVh?: number;
+  /**
+   * Flip brightness→glyph-density mapping. Set true when your photo has a
+   * dark background with a lighter subject, OR whenever the output looks
+   * "reversed" (e.g. white hair / black face). Default false (works for
+   * typical white-background portraits).
+   */
+  invert?: boolean;
 }
 
-export default function AsciiRenderer({ heightVh = 0.38 }: Props) {
+export default function AsciiRenderer({
+  heightVh = 0.38,
+  invert = false,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [fallback, setFallback] = useState(false);
@@ -319,56 +389,65 @@ export default function AsciiRenderer({ heightVh = 0.38 }: Props) {
       let videoEl: HTMLVideoElement | null = null;
       let videoSize = { w: 512, h: 512 };
 
-      const hasMp4 = await probeAsset("/avatar.mp4");
-      const hasJpg = hasMp4 ? false : await probeAsset("/avatar.jpg");
-
-      if (hasMp4 && videoRef.current) {
-        videoEl = videoRef.current;
-        videoEl.src = "/avatar.mp4";
-        videoEl.muted = true;
-        videoEl.loop = true;
-        videoEl.playsInline = true;
-        videoEl.crossOrigin = "anonymous";
-        await new Promise<void>((resolve) => {
-          const onReady = () => {
+      // 1) Try any video candidate first (animated — richest effect).
+      let videoLoaded = false;
+      if (videoRef.current) {
+        const v = videoRef.current;
+        v.muted = true;
+        v.loop = true;
+        v.playsInline = true;
+        v.crossOrigin = "anonymous";
+        for (const url of VIDEO_CANDIDATES) {
+          if (await probeVideo(v, url)) {
+            videoEl = v;
             videoSize = {
-              w: videoEl!.videoWidth || 512,
-              h: videoEl!.videoHeight || 512,
+              w: v.videoWidth || 512,
+              h: v.videoHeight || 512,
             };
-            resolve();
-          };
-          videoEl!.addEventListener("loadeddata", onReady, { once: true });
-          videoEl!.addEventListener("error", () => resolve(), { once: true });
-          videoEl!.load();
-        });
+            videoLoaded = true;
+            break;
+          }
+        }
+      }
+
+      if (videoLoaded && videoEl) {
         try {
           await videoEl.play();
         } catch {
           /* autoplay blocked — will resume on first user interaction */
         }
         const vt = new THREE.VideoTexture(videoEl);
-        vt.colorSpace = THREE.SRGBColorSpace;
+        // Use NoColorSpace so the shader samples raw pixel values. Applying
+        // sRGB decoding here would distort the luma-based contrast math,
+        // often producing "inverted" looking output (dark face / light hair).
+        vt.colorSpace = THREE.NoColorSpace;
         vt.minFilter = THREE.LinearFilter;
         vt.magFilter = THREE.LinearFilter;
         sourceTexture = vt;
-      } else if (hasJpg) {
-        sourceTexture = await new Promise<THREE.Texture>((resolve, reject) => {
-          new THREE.TextureLoader().load(
-            "/avatar.jpg",
-            (tex) => {
-              tex.colorSpace = THREE.SRGBColorSpace;
-              tex.minFilter = THREE.LinearFilter;
-              tex.magFilter = THREE.LinearFilter;
-              const img = tex.image as HTMLImageElement;
-              videoSize = { w: img.width, h: img.height };
-              resolve(tex);
-            },
-            undefined,
-            reject,
-          );
-        }).catch(() => buildPlaceholderTexture());
       } else {
-        sourceTexture = buildPlaceholderTexture();
+        // 2) Try each image candidate in order.
+        let imageTexture: THREE.Texture | null = null;
+        for (const url of IMAGE_CANDIDATES) {
+          const img = await probeImage(url);
+          if (img) {
+            const tex = new THREE.Texture(img);
+            // See note above re: NoColorSpace for correct luma mapping.
+            tex.colorSpace = THREE.NoColorSpace;
+            tex.minFilter = THREE.LinearFilter;
+            tex.magFilter = THREE.LinearFilter;
+            tex.needsUpdate = true;
+            videoSize = { w: img.width, h: img.height };
+            imageTexture = tex;
+            break;
+          }
+        }
+
+        if (imageTexture) {
+          sourceTexture = imageTexture;
+        } else {
+          // 3) Fall back to the procedural placeholder silhouette.
+          sourceTexture = buildPlaceholderTexture();
+        }
       }
 
       if (disposed) {
@@ -431,6 +510,7 @@ export default function AsciiRenderer({ heightVh = 0.38 }: Props) {
           uWhiteSoftness: { value: PARAMS.whiteSoftness },
           uContrast: { value: PARAMS.contrast },
           uAlpha: { value: PARAMS.alpha },
+          uInvert: { value: invert ? 1 : 0 },
           uForegroundColor: { value: new THREE.Color("#000000") },
           uBackgroundColor: { value: new THREE.Color("#ffffff") },
         },
@@ -544,7 +624,7 @@ export default function AsciiRenderer({ heightVh = 0.38 }: Props) {
       });
       cleanupTasks.length = 0;
     };
-  }, [heightVh]);
+  }, [heightVh, invert]);
 
   if (fallback) {
     return (

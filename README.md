@@ -1,6 +1,4 @@
-# SwayLab Mirror — 复刻
-
-一个对 [swaylab.ai](https://swaylab.ai/) 智能体对话界面的复刻：顶部 ASCII 头像 + 等宽风格对话 + 预留 LLM 接口。
+一个智能体对话界面：顶部 ASCII 头像 + 等宽风格对话 + 预留 LLM 接口。
 
 技术栈：Next.js 14 (App Router) · TypeScript · Tailwind CSS。
 
@@ -55,15 +53,12 @@ lib/
 ## 自定义
 
 - **修改欢迎语**：`components/ChatContainer.tsx` 的 `WELCOME_TEXT`。
-- **替换人像视频 / 图片**：把你自己的素材放到 `public/`：
-  - `public/avatar.mp4`（优先，推荐 ~512×512 灰度循环视频，1 MB 左右）
-  - 或 `public/avatar.jpg`（静态图片备选）
-  - 两者都没有时会自动使用内置的占位剪影。
+- **替换人像（视频或照片均可）**：把你自己的素材放到 `public/` 目录，文件名按下面顺序优先识别：
+  - 视频（动态效果最佳）：`avatar.mp4` → `avatar.webm`
+  - 照片（静态，完全支持）：`avatar.jpg` → `avatar.jpeg` → `avatar.png` → `avatar.webp`
+  - 都没有时使用内置的占位剪影。
+  - 照片建议：正方形或接近正方形，背景干净，深浅对比明显效果最好。
 - **调整人像效果**：`components/AsciiRenderer.tsx` 顶部的 `PARAMS` 常量
   控制对比度、字符密度、字形缩放、像素抖动强度等。字符密度阶梯在
   同文件的 `CHARSET` 常量里定义。
 - **扩充预设回复**：`lib/mockReplies.ts` 的 `rules` 与 `fallback`。
-
-## License
-
-MIT。仅作技术演示用途，UI 设计版权归原站所有。

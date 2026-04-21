@@ -133,9 +133,11 @@ export default function ChatContainer() {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
       {/* Fixed avatar area (does not scroll). Full viewport width, ~38vh tall,
-          renders a live ASCII portrait via WebGL shader. */}
+          renders a live ASCII portrait via WebGL shader.
+          Tip: if your photo's face renders "inverted" (e.g. white hair /
+          black face), pass `invert` to flip the density mapping. */}
       <div className="flex-shrink-0 w-screen">
-        <AsciiRenderer heightVh={0.38} />
+        <AsciiRenderer heightVh={0.38} invert={false} />
       </div>
 
       {/*
