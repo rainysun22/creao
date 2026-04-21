@@ -54,8 +54,14 @@ lib/
 
 ## 自定义
 
-- **修改欢迎语**：`components/ChatContainer.tsx` 的 `INITIAL_MESSAGES`。
-- **修改 ASCII 头像**：`components/AsciiAvatar.tsx` 的 `BASE_ART`。
+- **修改欢迎语**：`components/ChatContainer.tsx` 的 `WELCOME_TEXT`。
+- **替换人像视频 / 图片**：把你自己的素材放到 `public/`：
+  - `public/avatar.mp4`（优先，推荐 ~512×512 灰度循环视频，1 MB 左右）
+  - 或 `public/avatar.jpg`（静态图片备选）
+  - 两者都没有时会自动使用内置的占位剪影。
+- **调整人像效果**：`components/AsciiRenderer.tsx` 顶部的 `PARAMS` 常量
+  控制对比度、字符密度、字形缩放、像素抖动强度等。字符密度阶梯在
+  同文件的 `CHARSET` 常量里定义。
 - **扩充预设回复**：`lib/mockReplies.ts` 的 `rules` 与 `fallback`。
 
 ## License

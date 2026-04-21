@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import AsciiAvatar from "./AsciiAvatar";
+import AsciiRenderer from "./AsciiRenderer";
 import ChatMessage, { type UIMessage } from "./ChatMessage";
 import ChatInput from "./ChatInput";
 import { sendMessage } from "@/lib/chatClient";
@@ -132,9 +132,10 @@ export default function ChatContainer() {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
-      {/* Fixed avatar area (does not scroll) */}
-      <div className="flex-shrink-0 pt-10 pb-2 flex justify-center">
-        <AsciiAvatar />
+      {/* Fixed avatar area (does not scroll). Full viewport width, ~38vh tall,
+          renders a live ASCII portrait via WebGL shader. */}
+      <div className="flex-shrink-0 w-screen">
+        <AsciiRenderer heightVh={0.38} />
       </div>
 
       {/*
